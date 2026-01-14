@@ -9,7 +9,7 @@ const machine = new CoffeeMachine();
 export { machine };
 
 // Main loop
-async function main() {
+export async function main() {
     let running = true;
 
     while (running) {
@@ -34,10 +34,13 @@ async function main() {
     }
 }
 
-main().catch(error => {
-    showError(error);
-    process.exit(1);
-});
+// Only run main if this file is executed directly (not imported in tests)
+if (process.argv[1] && process.argv[1].endsWith('main.js')) {
+    main().catch(error => {
+        showError(error);
+        process.exit(1);
+    });
+}
 
 // Handlers
 export async function handleBuy() {

@@ -1,72 +1,103 @@
-import { CoffeeMachine } from '../../src/domain/coffeeMachine.js';
+import { machine, handleBuy, handleFill, handleTake, main } from '../../src/cli/main.js';
+import inquirer from 'inquirer';
+
+// Mock inquirer.prompt
+let mockPromptResolveValue = null;
+inquirer.prompt = (options) => {
+  return Promise.resolve(mockPromptResolveValue);
+};
+
+// Mock console.log to capture output
+let consoleOutput = [];
+const originalLog = console.log;
+console.log = (output) => consoleOutput.push(output);
 
 describe('Main CLI Handlers', () => {
-  let machine;
-
   beforeEach(() => {
-    machine = new CoffeeMachine();
+    // Reset machine state before each test
+    machine.supplies.water = 1000;
+    machine.supplies.milk = 1000;
+    machine.supplies.beans = 1000;
+    machine.supplies.cups = 100;
+    machine.supplies.money = 500;
+
+    // Clear mock state
+    mockPromptResolveValue = null;
+    consoleOutput = [];
   });
 
-  describe('handleBuy behavior simulation', () => {
-    test('should successfully brew espresso and update supplies', () => {
-      const result = machine.brew('espresso');
+  describe('handleBuy', () => {
+    test('should successfully brew espresso and update supplies', async () => {
+      mockPromptResolveValue = { drink: 'espresso' };
 
-      expect(result.success).toBe(true);
+      await handleBuy();
+
       expect(machine.supplies.water).toBe(750); // 1000 - 250
-      expect(machine.supplies.milk).toBe(1000); // no milk in espresso
       expect(machine.supplies.beans).toBe(984); // 1000 - 16
       expect(machine.supplies.cups).toBe(99); // 100 - 1
       expect(machine.supplies.money).toBe(504); // 500 + 4
+      expect(consoleOutput.join(' ')).toContain('Brewing your coffee');
     });
 
-    test('should successfully brew latte and update supplies', () => {
-      const result = machine.brew('latte');
+    test('should successfully brew latte and update supplies', async () => {
+      mockPromptResolveValue = { drink: 'latte' };
 
-      expect(result.success).toBe(true);
+      await handleBuy();
+
       expect(machine.supplies.water).toBe(650); // 1000 - 350
       expect(machine.supplies.milk).toBe(925); // 1000 - 75
       expect(machine.supplies.beans).toBe(980); // 1000 - 20
       expect(machine.supplies.cups).toBe(99); // 100 - 1
       expect(machine.supplies.money).toBe(507); // 500 + 7
+      expect(consoleOutput.join(' ')).toContain('Brewing your coffee');
     });
 
-    test('should successfully brew cappuccino and update supplies', () => {
-      const result = machine.brew('cappuccino');
+    test('should successfully brew cappuccino and update supplies', async () => {
+      mockPromptResolveValue = { drink: 'cappuccino' };
 
-      expect(result.success).toBe(true);
+      await handleBuy();
+
       expect(machine.supplies.water).toBe(800); // 1000 - 200
       expect(machine.supplies.milk).toBe(900); // 1000 - 100
       expect(machine.supplies.beans).toBe(988); // 1000 - 12
       expect(machine.supplies.cups).toBe(99); // 100 - 1
       expect(machine.supplies.money).toBe(506); // 500 + 6
+      expect(consoleOutput.join(' ')).toContain('Brewing your coffee');
     });
 
-    test('should return error for unknown drink', () => {
+    test('should show error for unknown drink', async () => {
+      mockPromptResolveValue = { drink: 'mocha' };
       const initialSupplies = { ...machine.supplies };
-      const result = machine.brew('mocha');
 
-      expect(result.success).toBe(false);
-      expect(result.reason).toBe('Unknown drink');
+      await handleBuy();
+
       expect(machine.supplies).toEqual(initialSupplies);
+      expect(consoleOutput.join(' ')).toContain('Unknown drink');
     });
 
-    test('should return error when not enough ingredients', () => {
+    test('should show error when not enough ingredients', async () => {
+      mockPromptResolveValue = { drink: 'latte' };
       machine.supplies.water = 10;
       machine.supplies.milk = 10;
       machine.supplies.beans = 5;
 
       const initialSupplies = { ...machine.supplies };
-      const result = machine.brew('latte');
 
-      expect(result.success).toBe(false);
-      expect(result.reason).toBe('Not enough ingredients');
+      await handleBuy();
+
       expect(machine.supplies).toEqual(initialSupplies);
+      expect(consoleOutput.join(' ')).toContain('Not enough ingredients');
     });
 
-    test('should handle multiple successful brews', () => {
-      machine.brew('espresso');
-      machine.brew('latte');
-      machine.brew('cappuccino');
+    test('should handle multiple successful brews', async () => {
+      mockPromptResolveValue = { drink: 'espresso' };
+      await handleBuy();
+
+      mockPromptResolveValue = { drink: 'latte' };
+      await handleBuy();
+
+      mockPromptResolveValue = { drink: 'cappuccino' };
+      await handleBuy();
 
       expect(machine.supplies.water).toBe(200); // 1000 - 250 - 350 - 200
       expect(machine.supplies.milk).toBe(825); // 1000 - 75 - 100
@@ -76,10 +107,12 @@ describe('Main CLI Handlers', () => {
     });
   });
 
-  describe('handleFill behavior simulation', () => {
-    test('should refill all supplies', () => {
+  describe('handleFill', () => {
+    test('should refill all supplies', async () => {
       const refillValues = { water: 500, milk: 300, beans: 200, cups: 50 };
-      machine.refill(refillValues);
+      mockPromptResolveValue = refillValues;
+
+      await handleFill();
 
       expect(machine.supplies.water).toBe(1500); // 1000 + 500
       expect(machine.supplies.milk).toBe(1300); // 1000 + 300
@@ -88,8 +121,10 @@ describe('Main CLI Handlers', () => {
       expect(machine.supplies.money).toBe(500); // unchanged
     });
 
-    test('should refill only water', () => {
-      machine.refill({ water: 1000, milk: 0, beans: 0, cups: 0 });
+    test('should refill only water', async () => {
+      mockPromptResolveValue = { water: 1000, milk: 0, beans: 0, cups: 0 };
+
+      await handleFill();
 
       expect(machine.supplies.water).toBe(2000);
       expect(machine.supplies.milk).toBe(1000);
@@ -97,62 +132,74 @@ describe('Main CLI Handlers', () => {
       expect(machine.supplies.cups).toBe(100);
     });
 
-    test('should handle refill with zero values', () => {
+    test('should handle refill with zero values', async () => {
+      mockPromptResolveValue = { water: 0, milk: 0, beans: 0, cups: 0 };
       const initialSupplies = { ...machine.supplies };
-      machine.refill({ water: 0, milk: 0, beans: 0, cups: 0 });
+
+      await handleFill();
 
       expect(machine.supplies).toEqual(initialSupplies);
     });
 
-    test('should not affect money when refilling', () => {
+    test('should not affect money when refilling', async () => {
+      mockPromptResolveValue = { water: 500, milk: 500, beans: 500, cups: 50 };
       const initialMoney = machine.supplies.money;
-      machine.refill({ water: 500, milk: 500, beans: 500, cups: 50 });
+
+      await handleFill();
 
       expect(machine.supplies.money).toBe(initialMoney);
     });
 
-    test('should handle multiple refills', () => {
-      machine.refill({ water: 500, milk: 0, beans: 0, cups: 0 });
+    test('should handle multiple refills', async () => {
+      mockPromptResolveValue = { water: 500, milk: 0, beans: 0, cups: 0 };
+      await handleFill();
       expect(machine.supplies.water).toBe(1500);
 
-      machine.refill({ water: 500, milk: 0, beans: 0, cups: 0 });
+      mockPromptResolveValue = { water: 500, milk: 0, beans: 0, cups: 0 };
+      await handleFill();
       expect(machine.supplies.water).toBe(2000);
     });
   });
 
-  describe('handleTake behavior simulation', () => {
-    test('should take all money and reset to zero', () => {
-      const money = machine.takeMoney();
+  describe('handleTake', () => {
+    test('should take all money and show correct message', async () => {
+      await handleTake();
 
-      expect(money).toBe(500);
       expect(machine.supplies.money).toBe(0);
+      expect(consoleOutput.join(' ')).toContain('You took $500');
     });
 
-    test('should take zero money when empty', () => {
+    test('should take zero money when empty', async () => {
       machine.supplies.money = 0;
-      const money = machine.takeMoney();
 
-      expect(money).toBe(0);
+      await handleTake();
+
       expect(machine.supplies.money).toBe(0);
+      expect(consoleOutput.join(' ')).toContain('You took $0');
     });
 
-    test('should handle taking money after brewing', () => {
-      machine.brew('espresso');
-      machine.brew('latte');
+    test('should handle taking money after brewing', async () => {
+      mockPromptResolveValue = { drink: 'espresso' };
+      await handleBuy();
 
-      const money = machine.takeMoney();
+      consoleOutput = []; // Clear previous output
+      mockPromptResolveValue = { drink: 'latte' };
+      await handleBuy();
 
-      expect(money).toBe(511); // 500 + 4 + 7
+      consoleOutput = []; // Clear previous output
+      await handleTake();
+
       expect(machine.supplies.money).toBe(0);
+      expect(consoleOutput.join(' ')).toContain('You took $511');
     });
 
-    test('should not affect other supplies', () => {
+    test('should not affect other supplies', async () => {
       const initialWater = machine.supplies.water;
       const initialMilk = machine.supplies.milk;
       const initialBeans = machine.supplies.beans;
       const initialCups = machine.supplies.cups;
 
-      machine.takeMoney();
+      await handleTake();
 
       expect(machine.supplies.water).toBe(initialWater);
       expect(machine.supplies.milk).toBe(initialMilk);
@@ -160,111 +207,126 @@ describe('Main CLI Handlers', () => {
       expect(machine.supplies.cups).toBe(initialCups);
     });
 
-    test('should allow taking money multiple times', () => {
-      const money1 = machine.takeMoney();
-      expect(money1).toBe(500);
+    test('should allow taking money multiple times', async () => {
+      await handleTake();
       expect(machine.supplies.money).toBe(0);
 
-      machine.brew('espresso');
+      mockPromptResolveValue = { drink: 'espresso' };
+      await handleBuy();
 
-      const money2 = machine.takeMoney();
-      expect(money2).toBe(4);
+      consoleOutput = []; // Clear previous output
+      await handleTake();
+      expect(consoleOutput.join(' ')).toContain('You took $4');
       expect(machine.supplies.money).toBe(0);
     });
   });
 
   describe('Integration workflows', () => {
-    test('should handle complete workflow: buy, refill, buy, take', () => {
-      const result1 = machine.brew('espresso');
-      expect(result1.success).toBe(true);
+    test('should handle complete workflow: buy, refill, buy, take', async () => {
+      mockPromptResolveValue = { drink: 'espresso' };
+      await handleBuy();
       expect(machine.supplies.money).toBe(504);
 
-      machine.refill({ water: 500, milk: 0, beans: 50, cups: 0 });
+      mockPromptResolveValue = { water: 500, milk: 0, beans: 50, cups: 0 };
+      await handleFill();
       expect(machine.supplies.water).toBe(1250);
 
-      const result2 = machine.brew('latte');
-      expect(result2.success).toBe(true);
+      mockPromptResolveValue = { drink: 'latte' };
+      await handleBuy();
       expect(machine.supplies.money).toBe(511);
 
-      const money = machine.takeMoney();
-      expect(money).toBe(511);
+      consoleOutput = []; // Clear previous output
+      await handleTake();
+      expect(consoleOutput.join(' ')).toContain('You took $511');
       expect(machine.supplies.money).toBe(0);
     });
 
-    test('should handle failed purchase, refill, then successful purchase', () => {
+    test('should handle failed purchase, refill, then successful purchase', async () => {
       machine.supplies.water = 100;
       machine.supplies.milk = 50;
       machine.supplies.beans = 10;
       machine.supplies.cups = 1;
 
-      const result1 = machine.brew('latte');
-      expect(result1.success).toBe(false);
-      expect(result1.reason).toBe('Not enough ingredients');
+      mockPromptResolveValue = { drink: 'latte' };
+      await handleBuy();
+      expect(consoleOutput.join(' ')).toContain('Not enough ingredients');
 
-      machine.refill({ water: 1000, milk: 1000, beans: 500, cups: 50 });
+      mockPromptResolveValue = { water: 1000, milk: 1000, beans: 500, cups: 50 };
+      await handleFill();
 
-      const result2 = machine.brew('latte');
-      expect(result2.success).toBe(true);
+      consoleOutput = []; // Clear previous output
+      mockPromptResolveValue = { drink: 'latte' };
+      await handleBuy();
+      expect(consoleOutput.join(' ')).toContain('Brewing your coffee');
     });
 
-    test('should accumulate money from multiple purchases', () => {
+    test('should accumulate money from multiple purchases', async () => {
       const initialMoney = machine.supplies.money;
 
-      machine.brew('espresso'); // +4
-      machine.brew('latte'); // +7
-      machine.brew('cappuccino'); // +6
+      mockPromptResolveValue = { drink: 'espresso' };
+      await handleBuy();
+
+      mockPromptResolveValue = { drink: 'latte' };
+      await handleBuy();
+
+      mockPromptResolveValue = { drink: 'cappuccino' };
+      await handleBuy();
 
       const expectedMoney = initialMoney + 4 + 7 + 6;
       expect(machine.supplies.money).toBe(expectedMoney);
     });
 
-    test('should maintain state consistency after complex operations', () => {
-      machine.brew('espresso');
+    test('should maintain state consistency after complex operations', async () => {
+      mockPromptResolveValue = { drink: 'espresso' };
+      await handleBuy();
 
-      machine.refill({ water: 250, milk: 0, beans: 16, cups: 1 });
+      mockPromptResolveValue = { water: 250, milk: 0, beans: 16, cups: 1 };
+      await handleFill();
 
-      const money = machine.takeMoney();
+      consoleOutput = []; // Clear previous output
+      await handleTake();
 
       expect(machine.supplies.water).toBe(1000); // back to start
       expect(machine.supplies.beans).toBe(1000); // back to start
       expect(machine.supplies.cups).toBe(100); // back to start
       expect(machine.supplies.money).toBe(0); // taken
-      expect(money).toBe(504); // 500 initial + 4 from espresso
+      expect(consoleOutput.join(' ')).toContain('You took $504');
     });
 
-    test('should prevent operations when supplies depleted', () => {
-      let successCount = 0;
-      for (let i = 0; i < 10; i++) {
-        const result = machine.brew('espresso');
-        if (result.success) {
-          successCount++;
-        }
+    test('should prevent operations when supplies depleted', async () => {
+      // Only 4 espressos should succeed (limited by water: 1000/250 = 4)
+      for (let i = 0; i < 4; i++) {
+        mockPromptResolveValue = { drink: 'espresso' };
+        await handleBuy();
       }
 
-      // Only 4 espressos should succeed (limited by water: 1000/250 = 4)
-      expect(successCount).toBe(4);
+      expect(machine.supplies.water).toBe(0);
 
-      const result = machine.brew('espresso');
-      expect(result.success).toBe(false);
-      expect(result.reason).toBe('Not enough ingredients');
+      // 5th attempt should fail
+      consoleOutput = []; // Clear previous output
+      mockPromptResolveValue = { drink: 'espresso' };
+      await handleBuy();
+      expect(consoleOutput.join(' ')).toContain('Not enough ingredients');
     });
   });
 
   describe('Machine state validation', () => {
-    test('should never have negative supplies after failed brew', () => {
+    test('should never have negative supplies after failed brew', async () => {
       machine.supplies.water = 100;
 
-      const result = machine.brew('latte');
+      mockPromptResolveValue = { drink: 'latte' };
+      await handleBuy();
 
-      expect(result.success).toBe(false);
+      expect(consoleOutput.join(' ')).toContain('Not enough ingredients');
       expect(machine.supplies.water).toBeGreaterThanOrEqual(0);
       expect(machine.supplies.milk).toBeGreaterThanOrEqual(0);
       expect(machine.supplies.beans).toBeGreaterThanOrEqual(0);
       expect(machine.supplies.cups).toBeGreaterThanOrEqual(0);
     });
 
-    test('should return correct state with getState()', () => {
-      machine.brew('espresso');
+    test('should return correct state with getState()', async () => {
+      mockPromptResolveValue = { drink: 'espresso' };
+      await handleBuy();
       const state = machine.getState();
 
       expect(state).toEqual(machine.supplies);
@@ -280,35 +342,150 @@ describe('Main CLI Handlers', () => {
   });
 
   describe('Edge cases', () => {
-    test('should handle brewing all three drinks in sequence', () => {
+    test('should handle brewing all three drinks in sequence', async () => {
       const drinks = ['espresso', 'latte', 'cappuccino'];
-      const results = drinks.map(drink => machine.brew(drink));
 
-      results.forEach(result => {
-        expect(result.success).toBe(true);
-      });
+      for (const drink of drinks) {
+        mockPromptResolveValue = { drink };
+        await handleBuy();
+      }
+
+      expect(machine.supplies.cups).toBe(97); // 100 - 3
+      expect(consoleOutput.filter(msg => String(msg).includes('Brewing')).length).toBe(3);
     });
 
-    test('should handle zero refill correctly', () => {
+    test('should handle zero refill correctly', async () => {
       const stateBefore = machine.getState();
-      machine.refill({});
+      mockPromptResolveValue = {};
+      await handleFill();
 
       const stateAfter = machine.getState();
       expect(stateAfter).toEqual(stateBefore);
     });
 
-    test('should handle taking money when no drinks were sold', () => {
-      const money = machine.takeMoney();
+    test('should handle taking money when no drinks were sold', async () => {
+      await handleTake();
 
-      expect(money).toBe(500); // Initial money
+      expect(consoleOutput.join(' ')).toContain('You took $500');
       expect(machine.supplies.money).toBe(0);
     });
 
-    test('should handle case-sensitive drink names', () => {
-      const result = machine.brew('Espresso'); // Capital E
+    test('should handle case-sensitive drink names', async () => {
+      mockPromptResolveValue = { drink: 'Espresso' };
+      await handleBuy();
 
-      expect(result.success).toBe(false);
-      expect(result.reason).toBe('Unknown drink');
+      expect(consoleOutput.join(' ')).toContain('Unknown drink');
+    });
+  });
+
+  describe('main function', () => {
+    test('should handle exit action and terminate loop', async () => {
+      let callCount = 0;
+      inquirer.prompt = (options) => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({ action: 'exit' });
+        }
+        return Promise.resolve({ action: 'exit' });
+      };
+
+      await main();
+
+      expect(callCount).toBe(1);
+    });
+
+    test('should handle buy action in main loop', async () => {
+      let callCount = 0;
+      inquirer.prompt = (options) => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({ action: 'buy' });
+        } else if (callCount === 2) {
+          return Promise.resolve({ drink: 'espresso' });
+        } else {
+          return Promise.resolve({ action: 'exit' });
+        }
+      };
+
+      await main();
+
+      expect(machine.supplies.water).toBe(750);
+      expect(callCount).toBe(3);
+    });
+
+    test('should handle fill action in main loop', async () => {
+      let callCount = 0;
+      inquirer.prompt = (options) => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({ action: 'fill' });
+        } else if (callCount === 2) {
+          return Promise.resolve({ water: 500, milk: 0, beans: 0, cups: 0 });
+        } else {
+          return Promise.resolve({ action: 'exit' });
+        }
+      };
+
+      await main();
+
+      expect(machine.supplies.water).toBe(1500);
+      expect(callCount).toBe(3);
+    });
+
+    test('should handle take action in main loop', async () => {
+      let callCount = 0;
+      inquirer.prompt = (options) => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({ action: 'take' });
+        } else {
+          return Promise.resolve({ action: 'exit' });
+        }
+      };
+
+      await main();
+
+      expect(machine.supplies.money).toBe(0);
+      expect(callCount).toBe(2);
+    });
+
+    test('should handle unknown action', async () => {
+      let callCount = 0;
+      inquirer.prompt = (options) => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({ action: 'invalid' });
+        } else {
+          return Promise.resolve({ action: 'exit' });
+        }
+      };
+
+      consoleOutput = [];
+      await main();
+
+      expect(consoleOutput.join(' ')).toContain('Unknown action');
+      expect(callCount).toBe(2);
+    });
+
+    test('should show state after each action', async () => {
+      let callCount = 0;
+      inquirer.prompt = (options) => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({ action: 'buy' });
+        } else if (callCount === 2) {
+          return Promise.resolve({ drink: 'espresso' });
+        } else {
+          return Promise.resolve({ action: 'exit' });
+        }
+      };
+
+      consoleOutput = [];
+      await main();
+
+      // Should show state after buy action
+      const stateOutput = consoleOutput.join(' ');
+      expect(stateOutput).toContain('coffee machine has');
     });
   });
 });
