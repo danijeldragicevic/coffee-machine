@@ -14,12 +14,13 @@ A command-line interface application for simulating a coffee machine, built with
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v18 or higher recommended)
+- Node.js (v20 or higher recommended)
 - npm (comes with Node.js)
 
 ### Installation
-1. Clone the repository or navigate to the project directory:
+1. Clone the repository and navigate to the project directory:
    ```bash
+   git clone https://github.com/danijeldragicevic/coffee-machine.git
    cd coffee-machine
    ```
 
