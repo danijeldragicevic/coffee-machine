@@ -8,6 +8,14 @@ const machine = new CoffeeMachine();
 // Export for testing
 export { machine };
 
+// Only run main if this file is executed directly (not imported in tests)
+if (process.argv[1] && process.argv[1].endsWith('main.js')) {
+    main().catch(error => {
+        showError(error);
+        process.exit(1);
+    });
+}
+
 // Main loop
 export async function main() {
     let running = true;
@@ -32,14 +40,6 @@ export async function main() {
         }
         showState(machine.getState());
     }
-}
-
-// Only run main if this file is executed directly (not imported in tests)
-if (process.argv[1] && process.argv[1].endsWith('main.js')) {
-    main().catch(error => {
-        showError(error);
-        process.exit(1);
-    });
 }
 
 // Handlers
